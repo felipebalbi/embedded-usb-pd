@@ -86,7 +86,7 @@ fn set_power_level_must_not_set_reserved_bits_34_and_above() {
         operating_current: 1500,
         output_voltage: 5000,
     })
-    .expect("argument values are within their field widths");
+    .unwrap();
 
     // The argument block begins at command bit 16, so command bit 34 is argument bit 18:
     // byte 2, bit 2. Everything from there up is reserved in Revision 1.2.
