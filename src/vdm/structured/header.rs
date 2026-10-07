@@ -147,10 +147,21 @@ mod tests {
             }
         }
 
+        /// USB PD R3.2 V1.2 Table 6.33 (Structured VDM Header) defines Command as a
+        /// 5-bit field (bits 4...0), with "16...31 - SVID Specific Commands".
+        ///
+        /// 127 and 255 are not encodable in a 5-bit field and must be rejected.
         #[test]
         fn svid_specific_upper_range() {
-            for v in [16u8, 17, 31, 127, 255] {
+            for v in [16u8, 17, 31] {
                 assert_eq!(Command::try_from(v), Ok(Command::SvidSpecific(v)));
+            }
+            for v in [32u8, 127, 255] {
+                assert!(
+                    Command::try_from(v).is_err(),
+                    "raw={v} exceeds the 5-bit Command field (USB PD R3.2 V1.2 Table 6.33) \
+                     and should be rejected"
+                );
             }
         }
 

@@ -399,12 +399,19 @@ mod tests {
             }
         }
 
+        /// USB PD R3.2 V1.2 Table 6.42 (Passive Cable VDO), VBUS Current Handling Capability:
+        ///   "00b - Invalid; receiver Shall assume 01b (3A)."
+        ///   "11b - Invalid; receiver Shall assume 01b (3A)."
+        ///
+        /// These are specified receive-side fallbacks, not parse errors. A conforming
+        /// receiver normalizes both to 3A rather than rejecting the cable.
         #[test]
-        fn invalid_values() {
+        fn invalid_values_fall_back_to_three_amps() {
             for v in [0u8, 3] {
-                assert!(
-                    VbusCurrentHandlingCapability::try_from(v).is_err(),
-                    "raw={v} should be invalid"
+                assert_eq!(
+                    VbusCurrentHandlingCapability::try_from(v),
+                    Ok(VbusCurrentHandlingCapability::ThreeAmps),
+                    "raw={v} must be normalized to 3A per USB PD R3.2 V1.2 Table 6.42"
                 );
             }
         }
@@ -413,16 +420,33 @@ mod tests {
     mod maximum_vbus_voltage {
         use super::*;
 
+        /// USB PD R3.2 V1.2 Table 6.42 (Passive Cable VDO) defines only two reportable
+        /// voltages: "00b - 20V" and "11b - 50V". 01b and 10b are deprecated and are
+        /// covered by `deprecated_values_fall_back_to_twenty_volts`.
         #[test]
         fn all_valid_variants() {
-            let cases: [(u8, MaximumVbusVoltage); 4] = [
+            let cases: [(u8, MaximumVbusVoltage); 2] = [
                 (0b00, MaximumVbusVoltage::TwentyVolt),
-                (0b01, MaximumVbusVoltage::ThirtyVolt),
-                (0b10, MaximumVbusVoltage::FortyVolt),
                 (0b11, MaximumVbusVoltage::FiftyVolt),
             ];
             for (raw, expected) in cases {
                 assert_eq!(MaximumVbusVoltage::try_from(raw), Ok(expected), "raw={raw}");
+            }
+        }
+
+        /// USB PD R3.2 V1.2 Table 6.42 (Passive Cable VDO), Maximum VBUS Voltage:
+        ///   "01b..10b - Deprecated, receiver Shall assume 00b (20V)."
+        ///
+        /// Encodings 01b and 10b are deprecated, not alternative voltages. A conforming
+        /// receiver reports 20V for both rather than 30V/40V.
+        #[test]
+        fn deprecated_values_fall_back_to_twenty_volts() {
+            for v in [0b01u8, 0b10] {
+                assert_eq!(
+                    MaximumVbusVoltage::try_from(v),
+                    Ok(MaximumVbusVoltage::TwentyVolt),
+                    "raw={v} is deprecated and must be reported as 20V per USB PD R3.2 V1.2 Table 6.42"
+                );
             }
         }
 

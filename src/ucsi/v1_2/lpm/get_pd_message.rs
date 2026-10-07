@@ -284,7 +284,15 @@ mod test {
     #[test]
     fn test_args_raw_roundtrip() {
         // SOP on connector 3, message offset 2, 1 byte, battery cap message type
-        let encoded: [u8; ArgsRaw::LEN] = [0x83, 0x08, 0x01, 0x02, 0x00, 0x00];
+        //
+        // UCSI 1.2 Table 4-50 (GET_PD_MESSAGE Command) places, as absolute command-bit offsets:
+        //   offset 26, width 8: Message Offset  -- "This field indicates the starting offset
+        //                                           (in bytes) of the message to be returned."
+        //   offset 34, width 8: Number of Bytes
+        //   offset 42, width 6: Response Message Type
+        // Minus the 16-bit command header these are payload bits [17:10], [25:18] and [31:26].
+        // UCSI 3.1 Table 6-51 keeps the same offsets, so this is not a revision difference.
+        let encoded: [u8; ArgsRaw::LEN] = [0x83, 0x08, 0x04, 0x08, 0x00, 0x00];
         let expected = Args {
             connector_number: 3,
             recipient: Recipient::Sop,
@@ -301,7 +309,9 @@ mod test {
     #[test]
     fn test_args_raw_roundtrip_recipient_cross_byte() {
         // SOP'' (0b011) on connector 0x7f, recipient bit 0 is in byte 0 and bit 1 in byte 1
-        let encoded: [u8; ArgsRaw::LEN] = [0xff, 0x01, 0x00, 0x04, 0x00, 0x00];
+        // Response Message Type occupies payload bits [31:26]; DiscoverIdentity (0x04) therefore
+        // lands in byte 3 as 0x10. See UCSI 1.2 Table 4-50.
+        let encoded: [u8; ArgsRaw::LEN] = [0xff, 0x01, 0x00, 0x10, 0x00, 0x00];
         let expected = Args {
             connector_number: 0x7f,
             recipient: Recipient::SopPp,
@@ -328,7 +338,8 @@ mod test {
     #[test]
     fn test_args_raw_invalid_message_type() {
         // Invalid message type on connector 3, message offset 14, 1 byte
-        let encoded: [u8; ArgsRaw::LEN] = [0x83, 0x38, 0x01, 0x0f, 0x00, 0x00];
+        // Response Message Type occupies payload bits [31:26]; see UCSI 1.2 Table 4-50.
+        let encoded: [u8; ArgsRaw::LEN] = [0x83, 0x38, 0x04, 0x3c, 0x00, 0x00];
         assert_eq!(
             Args::try_from(bytemuck::must_cast::<_, ArgsRaw>(encoded)),
             Err(InvalidArgs::InvalidMessageType(InvalidMessageType(0x0f)))

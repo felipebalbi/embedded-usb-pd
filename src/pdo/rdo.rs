@@ -476,7 +476,12 @@ mod tests {
 
     #[test]
     fn test_avs_roundtrip() {
-        const RAW_AVS: u32 = 0x35400202;
+        // USB PD R3.2 V1.2 Table 6.22 (Adjustable Voltage Supply RDO), bits 20...9 Output Voltage:
+        //   "Requested output voltage at the Source's connector, in 25mV units. Bits 10..9 Shall
+        //    be set to 00b, making the effective voltage step size 100mV."
+        // AVS is NOT the 20mV PPS encoding. Field value 800 therefore means 20000mV, not 16000mV.
+        // 800 == 0b1100100000, so bits 10..9 are 00b as required.
+        const RAW_AVS: u32 = 0x35464002;
         let rdo = Rdo::for_pdo(
             RAW_AVS,
             // These values don't matter, only the kind is used
@@ -493,7 +498,7 @@ mod tests {
             no_usb_suspend: true,
             unchunked_extended_messages_support: false,
             epr_capable: true,
-            output_voltage_mv: 20,
+            output_voltage_mv: 20000,
             operating_current_ma: 100,
         });
         assert_eq!(rdo, expected);

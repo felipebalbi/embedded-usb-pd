@@ -268,8 +268,32 @@ mod tests {
         raw.set_extended_alert_type(0x04);
         assert_eq!(Ado::try_from(raw).unwrap(), Ado::ControllerInitiatedWake);
 
+        // USB PD R3.2 V1.2 Table 6.25 (Extended Alert Event Type) defines:
+        //   "5 - Source is about to reduce Source Capabilities"
+        // A conforming extended alert carrying event 5 must not be rejected.
         raw.set_extended_alert_type(0x05);
-        assert_eq!(Ado::try_from(raw), Err(InvalidType(raw.0)));
+        assert!(
+            Ado::try_from(raw).is_ok(),
+            "extended alert event 5 (Source about to reduce Source Capabilities) is defined by \
+             USB PD R3.2 V1.2 Table 6.25 and must be accepted"
+        );
+    }
+
+    /// USB PD R3.2 V1.2 Section 7.14.1:
+    ///   "Multiple event bits May be set in one Alert Message."
+    ///
+    /// An Alert is a set of independent events, not a single event. A conforming
+    /// OCP+OTP alert must not be rejected, and must not lose either event.
+    #[test]
+    fn test_ado_try_from_multiple_simultaneous_events() {
+        let mut raw = AdoRaw(0);
+        // OCP (0x04) and OTP (0x08) reported together.
+        raw.set_alert_type(0x04 | 0x08);
+        assert!(
+            Ado::try_from(raw).is_ok(),
+            "a conforming Alert with both OCP and OTP set must be accepted \
+             (USB PD R3.2 V1.2 S7.14.1)"
+        );
     }
 
     #[test]

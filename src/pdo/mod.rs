@@ -320,6 +320,9 @@ mod test {
 
     #[test]
     fn test_contract_operating_current_ma_battery() {
+        // Deliberately uses a power/voltage pair that does NOT divide evenly into whole amperes.
+        // 45000mW at 20000mV is 2.25A == 2250mA. The previous 40000mW/20000mV fixture divided
+        // exactly and so could not distinguish `1000 * (mW / mV)` from `(1000 * mW) / mV`.
         let contract = Contract::from_sink(
             sink::Pdo::Battery(BatteryData {
                 max_voltage_mv: 20000,
@@ -327,8 +330,8 @@ mod test {
                 operational_power_mw: 60000,
             }),
             Rdo::Battery(rdo::BatteryData {
-                operating_power_mw: 40000,
-                max_operating_power_mw: 45000,
+                operating_power_mw: 45000,
+                max_operating_power_mw: 50000,
                 object_position: 0,
                 capability_mismatch: false,
                 usb_comm_capable: false,
@@ -338,7 +341,7 @@ mod test {
             }),
         );
 
-        assert_eq!(contract.operating_current_ma(), Some(2000));
+        assert_eq!(contract.operating_current_ma(), Some(2250));
     }
 
     #[test]
