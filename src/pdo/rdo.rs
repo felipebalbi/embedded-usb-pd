@@ -474,6 +474,37 @@ mod tests {
         assert_eq!(u32::from(expected), RAW_PPS);
     }
 
+    /// USB PD R3.2 V1.2 Table 6.22 (Adjustable Voltage Supply RDO) applies to both
+    /// AVS APDO kinds. An EPR AVS PDO must therefore be answered with an AVS RDO,
+    /// decoded with the 25mV AVS encoding, not a PPS RDO with 20mV PPS scaling.
+    #[test]
+    fn test_epr_avs_pdo_yields_an_avs_rdo() {
+        const RAW_AVS: u32 = 0x35464002;
+        let rdo = Rdo::for_pdo(
+            RAW_AVS,
+            // These values don't matter, only the kind is used
+            sink::Pdo::Augmented(sink::Apdo::EprAvs(sink::EprAvsData {
+                max_voltage_mv: 0,
+                min_voltage_mv: 0,
+                pdp_mw: 0,
+            })),
+        )
+        .unwrap();
+
+        assert!(
+            matches!(rdo, Rdo::Avs(_)),
+            "an EPR AVS PDO must be answered with an AVS RDO, got {rdo:?}"
+        );
+
+        let Rdo::Avs(data) = rdo else {
+            unreachable!("asserted above")
+        };
+        assert_eq!(
+            data.output_voltage_mv, 20000,
+            "AVS Output Voltage is in 25mV units per PD R3.2 V1.2 Table 6.22"
+        );
+    }
+
     #[test]
     fn test_avs_roundtrip() {
         // USB PD R3.2 V1.2 Table 6.22 (Adjustable Voltage Supply RDO), bits 20...9 Output Voltage:

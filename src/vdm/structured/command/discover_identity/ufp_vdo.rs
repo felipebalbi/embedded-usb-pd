@@ -302,4 +302,65 @@ mod tests {
             }
         }
     }
+
+    mod device_capability {
+        use super::*;
+
+        /// USB PD R3.2 V1.2 Table 6.40 (UFP VDO). `device_capability` is raw bits
+        /// 27...24, within which:
+        ///
+        ///   bit 27     USB4 Device Capability
+        ///   bit 26     USB 3.2 Device Capability
+        ///   bits 25:24 USB 2.0 Device Capability, a two-bit enumeration:
+        ///       "00b - Device is not USB 2.0 capable."
+        ///       "01b - Device is USB 2.0 capable of USB 2.0 as a billboard Device only."
+        ///       "10b - Device is capable of USB 2.0."
+        ///       "11b - Invalid, receiver Shall assume 00b."
+        ///
+        /// USB 2.0 capability is therefore an enumeration, not two independent flags.
+        #[test]
+        fn usb2_capability_is_a_two_bit_enumeration() {
+            // 00b - not USB 2.0 capable
+            let none = DeviceCapability::from(0b0000);
+            assert!(!none.usb2p0, "00b means not USB 2.0 capable");
+            assert!(!none.usb2p0_billboard_only, "00b means not USB 2.0 capable");
+
+            // 01b - billboard device only
+            let billboard = DeviceCapability::from(0b0001);
+            assert!(
+                billboard.usb2p0_billboard_only,
+                "01b is billboard-only per PD R3.2 V1.2 Table 6.40"
+            );
+            assert!(
+                !billboard.usb2p0,
+                "01b is billboard-only and is not general USB 2.0 capability"
+            );
+
+            // 10b - capable of USB 2.0
+            let usb2 = DeviceCapability::from(0b0010);
+            assert!(usb2.usb2p0, "10b is general USB 2.0 capability per Table 6.40");
+            assert!(!usb2.usb2p0_billboard_only, "10b is not billboard-only");
+
+            // 11b - invalid, receiver shall assume 00b
+            let invalid = DeviceCapability::from(0b0011);
+            assert!(!invalid.usb2p0, "11b is invalid and must be treated as 00b");
+            assert!(
+                !invalid.usb2p0_billboard_only,
+                "11b is invalid and must be treated as 00b"
+            );
+        }
+
+        /// Bits 26 and 27 are independent single-bit flags and are decoded correctly;
+        /// this pins them so a fix to the USB 2.0 field cannot regress them.
+        #[test]
+        fn usb3p2_and_usb4_are_independent_flags() {
+            let usb3 = DeviceCapability::from(0b0100);
+            assert!(usb3.usb3p2);
+            assert!(!usb3.usb4);
+
+            let usb4 = DeviceCapability::from(0b1000);
+            assert!(usb4.usb4);
+            assert!(!usb4.usb3p2);
+        }
+    }
 }

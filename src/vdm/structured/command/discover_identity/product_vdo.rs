@@ -51,3 +51,37 @@ impl From<[u8; 4]> for ProductVdo {
         u32::from_le_bytes(bytes).into()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// USB PD R3.2 V1.2 Table 6.39 (Product VDO):
+    ///   "31...16  USB Product ID  -- Product ID assigned to the Port by the Vendor."
+    ///   "15...0   bcdDevice       -- Device Version assigned to the Port by the Vendor"
+    ///
+    /// The vector is deliberately asymmetric: a symmetric one would round-trip
+    /// successfully even with the two halves transposed.
+    #[test]
+    fn product_id_is_the_upper_half_and_bcd_device_the_lower() {
+        let vdo = ProductVdo::from(0x1234_0200u32);
+        assert_eq!(
+            vdo.usb_product_id,
+            ProductId(0x1234),
+            "USB Product ID is bits 31...16 per PD R3.2 V1.2 Table 6.39"
+        );
+        assert_eq!(
+            vdo.bcd_device,
+            Bcd(0x0200),
+            "bcdDevice is bits 15...0 per PD R3.2 V1.2 Table 6.39"
+        );
+    }
+
+    /// Little-endian byte order, same asymmetric vector as above.
+    #[test]
+    fn decodes_from_little_endian_bytes() {
+        let vdo = ProductVdo::from([0x00, 0x02, 0x34, 0x12]);
+        assert_eq!(vdo.usb_product_id, ProductId(0x1234));
+        assert_eq!(vdo.bcd_device, Bcd(0x0200));
+    }
+}
